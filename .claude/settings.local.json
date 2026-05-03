@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.nogizaka46.com)",
+      "WebFetch(domain:sakurazaka46.com)",
+      "WebFetch(domain:www.hinatazaka46.com)"
+    ]
+  }
+}

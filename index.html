@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>46スケジュール</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: #f0f2f5;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #1e293b;
+      color: white;
+      padding: 12px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 10px;
+      letter-spacing: 0.05em;
+    }
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+    }
+    .nav-btn {
+      background: rgba(255,255,255,0.12);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .nav-btn:active { background: rgba(255,255,255,0.3); }
+
+    #date-display {
+      font-size: 15px;
+      font-weight: 600;
+      min-width: 160px;
+      text-align: center;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    #date-display:active { background: rgba(255,255,255,0.15); }
+
+    .today-btn {
+      background: rgba(255,255,255,0.12);
+      border: none;
+      color: white;
+      padding: 0 12px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .today-btn:active { background: rgba(255,255,255,0.3); }
+
+    /* 日付ピッカー本体は非表示、JSで起動する */
+    #date-input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 1px;
+      height: 1px;
+    }
+
+    /* ── Main ── */
+    .container {
+      padding: 12px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* 件数 */
+    .count-info {
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    /* メッセージ（ローディング・空・エラー） */
+    .message {
+      text-align: center;
+      padding: 60px 24px;
+      color: #94a3b8;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .message .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* ── Cards ── */
+    .card {
+      display: block;
+      background: white;
+      border-radius: 12px;
+      padding: 14px 14px 14px 18px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      border-left: 4px solid #cbd5e1;
+      text-decoration: none;
+      color: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .card:active {
+      transform: scale(0.98);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    /* グループ別カラー */
+    .card.nogizaka   { border-left-color: #7c3aed; }
+    .card.sakurazaka { border-left-color: #dc2626; }
+    .card.hinatazaka { border-left-color: #2563eb; }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .group-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 99px;
+      color: white;
+      white-space: nowrap;
+    }
+    .nogizaka   .group-badge { background: #7c3aed; }
+    .sakurazaka .group-badge { background: #dc2626; }
+    .hinatazaka .group-badge { background: #2563eb; }
+
+    .category {
+      font-size: 12px;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    .time {
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    .title {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #1e293b;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <h1>46グループ スケジュール</h1>
+  <div class="date-nav">
+    <button class="nav-btn" id="prev-btn">‹</button>
+    <div id="date-display">読み込み中…</div>
+    <button class="nav-btn" id="next-btn">›</button>
+    <button class="today-btn" id="today-btn">今日</button>
+  </div>
+  <input type="date" id="date-input">
+</header>
+
+<main class="container" id="container">
+  <div class="message"><div>読み込み中…</div></div>
+</main>
+
+<script>
+  const GROUP_CLASS = {
+    '乃木坂46': 'nogizaka',
+    '櫻坂46':   'sakurazaka',
+    '日向坂46': 'hinatazaka',
+  };
+
+  // 今日の日付をJST（日本時間）で取得
+  function todayJST() {
+    const now = new Date();
+    const jst = new Date(now.getTime() + (9 * 60 + now.getTimezoneOffset()) * 60000);
+    return fmt(jst.getFullYear(), jst.getMonth() + 1, jst.getDate());
+  }
+
+  function fmt(y, m, d) {
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  function formatJP(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const day = ['日','月','火','水','木','金','土'][new Date(y, m - 1, d).getDay()];
+    return `${y}年${m}月${d}日（${day}）`;
+  }
+
+  function addDays(dateStr, n) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + n);
+    return fmt(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+  }
+
+  let currentDate = todayJST();
+
+  async function loadSchedule(dateStr) {
+    currentDate = dateStr;
+    document.getElementById('date-display').textContent = formatJP(dateStr);
+    document.getElementById('date-input').value = dateStr;
+
+    const container = document.getElementById('container');
+    container.innerHTML = '<div class="message"><div>読み込み中…</div></div>';
+
+    try {
+      const param = dateStr.replace(/-/g, '');
+      const res = await fetch(`/api/schedule?date=${param}`);
+      if (!res.ok) throw new Error('fetch failed');
+      const items = await res.json();
+      render(items, container);
+    } catch {
+      container.innerHTML = '<div class="message"><div class="icon">⚠️</div><div>データの取得に失敗しました。<br>しばらく経ってからお試しください。</div></div>';
+    }
+  }
+
+  function render(items, container) {
+    if (items.length === 0) {
+      container.innerHTML = '<div class="message"><div class="icon">📭</div><div>この日のスケジュールはありません</div></div>';
+      return;
+    }
+
+    const cards = items.map(item => {
+      const gc = GROUP_CLASS[item.group] || 'hinatazaka';
+      const catHtml  = item.category ? `<span class="category">${esc(item.category)}</span>` : '';
+      const timeHtml = item.time     ? `<span class="time">${esc(item.time)}</span>`         : '';
+      const href     = item.url || '#';
+      const target   = item.url ? 'target="_blank" rel="noopener"' : '';
+      return `
+        <a class="card ${gc}" href="${href}" ${target}>
+          <div class="card-meta">
+            <span class="group-badge">${esc(item.group)}</span>
+            ${catHtml}
+            ${timeHtml}
+          </div>
+          <div class="title">${esc(item.title)}</div>
+        </a>`;
+    }).join('');
+
+    container.innerHTML = `<div class="count-info">${items.length}件</div>` + cards;
+  }
+
+  function esc(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // 日付表示クリックで日付ピッカーを開く
+  document.getElementById('date-display').addEventListener('click', () => {
+    const input = document.getElementById('date-input');
+    input.style.pointerEvents = 'auto';
+    try { input.showPicker(); } catch { input.click(); }
+    setTimeout(() => { input.style.pointerEvents = 'none'; }, 500);
+  });
+
+  document.getElementById('prev-btn').addEventListener('click',  () => loadSchedule(addDays(currentDate, -1)));
+  document.getElementById('next-btn').addEventListener('click',  () => loadSchedule(addDays(currentDate,  1)));
+  document.getElementById('today-btn').addEventListener('click', () => loadSchedule(todayJST()));
+  document.getElementById('date-input').addEventListener('change', e => {
+    if (e.target.value) loadSchedule(e.target.value);
+  });
+
+  loadSchedule(currentDate);
+</script>
+
+</body>
+</html>
