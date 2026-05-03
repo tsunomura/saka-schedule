@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "api/schedule.py": {
-      "maxDuration": 30
-    }
-  }
-}
+{}
