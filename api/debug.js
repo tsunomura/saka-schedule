@@ -20,13 +20,44 @@ const FETCH_HEADERS = {
   'Accept-Language': 'ja,en;q=0.5',
 };
 
-const CHECK_CLASSES = [
-  'p-schedule__item',
-  'c-schedule__date--list',
-  'c-schedule__category',
-  'c-schedule__time--list',
-  'c-schedule__text',
-];
+function extractScheduleHints($) {
+  // スケジュール系クラスを持つ要素のouterHTMLサンプル（最大3件・各500文字）
+  const snippets = [];
+  $('[class]').each((_, el) => {
+    if (snippets.length >= 3) return false;
+    const cls = $(el).attr('class') || '';
+    if (cls.includes('schedule') || cls.includes('Schedule')) {
+      const outer = $.html(el).slice(0, 500);
+      snippets.push({ class: cls, html: outer });
+    }
+  });
+
+  // scriptタグからAPI URLっぽい文字列を抽出
+  const apiUrls = new Set();
+  $('script').each((_, el) => {
+    const src = $(el).attr('src') || '';
+    if (src) return;
+    const text = $(el).html() || '';
+    const matches = text.match(/["'`](\/[^"'`\s]*(?:schedule|api)[^"'`\s]*)["'`]/gi) || [];
+    matches.slice(0, 10).forEach(m => apiUrls.add(m.replace(/["'`]/g, '')));
+  });
+
+  // data-属性からAPI/URLヒントを抽出
+  const dataAttrs = [];
+  $('[class*="schedule"], [class*="Schedule"]').each((_, el) => {
+    const attrs = el.attribs || {};
+    const relevant = Object.entries(attrs).filter(([k]) => k.startsWith('data-'));
+    if (relevant.length) dataAttrs.push({ class: attrs.class, data: Object.fromEntries(relevant) });
+  });
+
+  // scriptタグのsrc一覧（jsファイル）
+  const scriptSrcs = [];
+  $('script[src]').each((_, el) => {
+    scriptSrcs.push($(el).attr('src'));
+  });
+
+  return { snippets, apiUrls: [...apiUrls], dataAttrs: dataAttrs.slice(0, 5), scriptSrcs: scriptSrcs.slice(0, 10) };
+}
 
 module.exports = async (req, res) => {
   const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -47,41 +78,28 @@ module.exports = async (req, res) => {
         const html = await response.text();
         const $ = cheerio.load(html);
 
-        const classFound = {};
-        for (const cls of CHECK_CLASSES) {
-          classFound[cls] = $(`.${cls}`).length;
-        }
-
-        // 実際に存在するスケジュール系クラスをサンプリング
         const scheduleClasses = new Set();
         $('[class]').each((_, el) => {
-          const classes = ($(el).attr('class') || '').split(/\s+/);
-          classes.forEach(c => {
-            if (c.includes('schedule') || c.includes('Schedule')) {
-              scheduleClasses.add(c);
-            }
+          ($(el).attr('class') || '').split(/\s+/).forEach(c => {
+            if (c.includes('schedule') || c.includes('Schedule')) scheduleClasses.add(c);
           });
         });
 
+        const hints = extractScheduleHints($);
+
         return {
           group: site.group,
-          url: site.url(dateStr),
           status: response.status,
-          ok: response.ok,
           htmlLength: html.length,
-          classFound,
           scheduleClasses: [...scheduleClasses].sort(),
+          ...hints,
         };
       } catch (err) {
         clearTimeout(timer);
         return {
           group: site.group,
-          url: site.url(dateStr),
           status: null,
-          ok: false,
           error: err.message,
-          classFound: {},
-          scheduleClasses: [],
         };
       }
     })
