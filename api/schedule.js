@@ -153,10 +153,12 @@ module.exports = async (req, res) => {
     ...(hinataBody ? parseHinatazaka(hinataBody, year, month, day) : []),
   ];
 
+  const GROUP_ORDER = { '乃木坂46': 0, '櫻坂46': 1, '日向坂46': 2 };
   items.sort((a, b) => {
     const ta = a.time || '99:99';
     const tb = b.time || '99:99';
-    return ta < tb ? -1 : ta > tb ? 1 : a.group.localeCompare(b.group);
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    return (GROUP_ORDER[a.group] ?? 9) - (GROUP_ORDER[b.group] ?? 9);
   });
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
