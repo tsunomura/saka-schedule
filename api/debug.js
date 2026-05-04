@@ -22,28 +22,38 @@ module.exports = async (req, res) => {
   const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const todayStr = nowJST.toISOString().slice(0, 10).replace(/-/g, '');
   const dateStr = (req.query.date || todayStr).replace(/\D/g, '');
-  const monthStr = dateStr.slice(0, 6); // YYYYMM
 
-  // ── 乃木坂46 API テスト ──────────────────────────────────────
-  const nogiApiBase = 'https://www.nogizaka46.com/s/n46/api/list/schedule';
-  const [nogiDay, nogiMonth, nogiRaw] = await Promise.all([
-    fetchText(`${nogiApiBase}?dy=${dateStr}`),
-    fetchText(`${nogiApiBase}?dy=${monthStr}`),
-    fetchText(`${nogiApiBase}`),
-  ]);
+  // ── 乃木坂46 API: 全フィールド確認（最初の1件まるごと）──
+  const nogiRes = await fetchText(`https://www.nogizaka46.com/s/n46/api/list/schedule?dy=${dateStr}`);
+  let nogiParsed = null;
+  let nogiFirstItem = null;
+  if (nogiRes.ok && nogiRes.body) {
+    try {
+      const json = nogiRes.body.replace(/^[^(]+\(/, '').replace(/\)\s*$/, '');
+      nogiParsed = JSON.parse(json);
+      nogiFirstItem = nogiParsed.data?.[0] ?? null;
+    } catch (e) {
+      nogiParsed = { parseError: e.message, raw: nogiRes.body.slice(0, 200) };
+    }
+  }
 
-  // ── 櫻坂46 HTML パースのテスト ──────────────────────────────
-  const sakuraPage = await fetchText(`https://sakurazaka46.com/s/s46/media/list?dy=${dateStr}`);
-  let sakuraItems = [];
-  if (sakuraPage.ok && sakuraPage.body) {
-    const $ = cheerio.load(sakuraPage.body);
-    const targetDate = `${dateStr.slice(0,4)}.${dateStr.slice(4,6)}.${dateStr.slice(6,8)}`;
+  // ── 櫻坂46: 日付フィルタ済みアイテム ──────────────────────
+  const targetDate = `${dateStr.slice(0,4)}.${dateStr.slice(4,6)}.${dateStr.slice(6,8)}`;
+  const sakuraRes = await fetchText(`https://sakurazaka46.com/s/s46/media/list?dy=${dateStr}`);
+  const sakuraFiltered = [];
+  if (sakuraRes.ok && sakuraRes.body) {
+    const $ = cheerio.load(sakuraRes.body);
     $('.js-schedule-detail').each((_, el) => {
-      const dateText = $(el).find('.date').text().trim().replace(/\s/g, '');
-      const type     = $(el).find('.type').text().trim();
+      const rawDate = $(el).find('.date').text().replace(/[ \s]/g, '');
+      const itemDate = rawDate.slice(0, 10);
+      if (itemDate !== targetDate) return;
+
+      const timeRaw = rawDate.slice(10).replace(/～$/, '').trim();
+      const category = $(el).find('.type').text().trim();
       const title    = $(el).find('h2.title, .title').first().text().trim();
-      const href     = $(el).find('a[href]').attr('href') || '';
-      sakuraItems.push({ dateText, targetDate, match: dateText.startsWith(targetDate), type, title, href: href.slice(0, 80) });
+      const href     = $(el).find('.lead a').attr('href') || $(el).find('a[href]').attr('href') || '';
+      const url      = href.startsWith('http') ? href : href ? 'https://sakurazaka46.com' + href : '';
+      sakuraFiltered.push({ itemDate, time: timeRaw, category, title, url });
     });
   }
 
@@ -52,14 +62,14 @@ module.exports = async (req, res) => {
   res.status(200).json({
     date: dateStr,
     nogi: {
-      'api?dy=YYYYMMDD': { status: nogiDay.status, bodySlice: nogiDay.body?.slice(0, 300) },
-      'api?dy=YYYYMM':   { status: nogiMonth.status, bodySlice: nogiMonth.body?.slice(0, 300) },
-      'api(no param)':   { status: nogiRaw.status, bodySlice: nogiRaw.body?.slice(0, 300) },
+      count: nogiParsed?.count,
+      firstItemKeys: nogiFirstItem ? Object.keys(nogiFirstItem) : null,
+      firstItem: nogiFirstItem,
     },
     sakura: {
-      itemCount: sakuraItems.length,
-      targetDate: `${dateStr.slice(0,4)}.${dateStr.slice(4,6)}.${dateStr.slice(6,8)}`,
-      items: sakuraItems.slice(0, 5),
+      targetDate,
+      matchCount: sakuraFiltered.length,
+      items: sakuraFiltered,
     },
   });
 };
