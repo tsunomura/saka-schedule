@@ -155,9 +155,10 @@ module.exports = async (req, res) => {
 
   const GROUP_ORDER = { '乃木坂46': 0, '櫻坂46': 1, '日向坂46': 2 };
   items.sort((a, b) => {
-    const ta = a.time || '99:99';
-    const tb = b.time || '99:99';
-    if (ta !== tb) return ta < tb ? -1 : 1;
+    const aHasTime = !!a.time;
+    const bHasTime = !!b.time;
+    if (aHasTime !== bHasTime) return aHasTime ? 1 : -1; // 時刻なしを上に
+    if (aHasTime && a.time !== b.time) return a.time < b.time ? -1 : 1;
     return (GROUP_ORDER[a.group] ?? 9) - (GROUP_ORDER[b.group] ?? 9);
   });
 
