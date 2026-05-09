@@ -59,11 +59,13 @@ function parseSakurazaka(html, year, month, targetDay) {
     const title    = $(el).find('h2.title, .title').first().text().trim();
     const href     = $(el).find('.lead a').attr('href') || $(el).find('a[href]').attr('href') || '';
     const url      = href.startsWith('http') ? href : href ? 'https://sakurazaka46.com' + href : '';
+    const members  = $(el).find('.memlist .members li a')
+      .map((_, m) => $(m).text().trim()).get().filter(Boolean);
 
     items.push({
       group: '櫻坂46',
       date: `${year}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`,
-      time, category, title, url, members: [],
+      time, category, title, url, members,
     });
   });
 

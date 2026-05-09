@@ -182,6 +182,20 @@
       line-height: 1.5;
       color: #1e293b;
     }
+
+    .members {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .member-tag {
+      font-size: 11px;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
   </style>
 </head>
 <body>
@@ -260,10 +274,13 @@
 
     const cards = items.map(item => {
       const gc = GROUP_CLASS[item.group] || 'hinatazaka';
-      const catHtml  = item.category ? `<span class="category">${esc(item.category)}</span>` : '';
-      const timeHtml = item.time     ? `<span class="time">${esc(item.time)}</span>`         : '';
-      const href     = item.url || '#';
-      const target   = item.url ? 'target="_blank" rel="noopener"' : '';
+      const catHtml     = item.category ? `<span class="category">${esc(item.category)}</span>` : '';
+      const timeHtml    = item.time     ? `<span class="time">${esc(item.time)}</span>`         : '';
+      const membersHtml = item.members?.length
+        ? `<div class="members">${item.members.map(m => `<span class="member-tag">${esc(m)}</span>`).join('')}</div>`
+        : '';
+      const href   = item.url || '#';
+      const target = item.url ? 'target="_blank" rel="noopener"' : '';
       return `
         <a class="card ${gc}" href="${href}" ${target}>
           <div class="card-meta">
@@ -272,6 +289,7 @@
             ${timeHtml}
           </div>
           <div class="title">${esc(item.title)}</div>
+          ${membersHtml}
         </a>`;
     }).join('');
 
